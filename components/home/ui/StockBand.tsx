@@ -59,7 +59,7 @@ export function StockBand({ quotes, direction, className }: StockBandProps) {
   // Animation settings
   const isLeft = direction === "left";
   const animateX = isLeft ? ["0%", "-50%"] : ["-50%", "0%"];
-  const duration = quotes.length * 2.5; // Scaled duration based on content density
+  const duration = quotes.length * 6; // Scaled duration based on content density
 
   // ─── RENDER ────────────────────────────────────
   return (

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Ticker } from "@/components/home/ui/Ticker";
+import { Navbar } from "@/components/home/ui/Navbar";
 import { Hero } from "@/components/home/sections/Hero";
 import { Briefing } from "@/components/home/sections/Briefing";
 import { NewsGrid } from "@/components/home/sections/NewsGrid";
@@ -21,12 +22,17 @@ export default async function Home() {
       {/* Sticky Utility Bar / Ticker */}
       <Ticker items={marketData} />
 
+      {/* Navbar — desktop links, mobile burger */}
+      <Navbar />
+
       <main id="main-content" role="main" className="flex-1">
         {/* Hero + Globe */}
         <Hero />
 
-        {/* Stock Bands */}
-        <StockBandRow />
+        {/* Stock Bands — mobile only */}
+        <div className="md:hidden">
+          <StockBandRow />
+        </div>
 
         {/* Daily Briefing */}
         <Briefing />
