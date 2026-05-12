@@ -31,10 +31,8 @@ export default async function Home() {
         {/* Hero + Globe */}
         <Hero />
 
-        {/* Stock Bands — mobile only */}
-        <div className="md:hidden">
-          <StockBandRow />
-        </div>
+        {/* Stock Bands */}
+        <StockBandRow />
 
         {/* Daily Briefing */}
         <Briefing />
