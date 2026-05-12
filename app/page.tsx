@@ -8,6 +8,8 @@ import { Footer } from "@/components/home/sections/Footer";
 import { StockBandRow } from "@/components/home/ui/StockBandRow";
 import { getMarketData } from "@/lib/markets";
 
+export const revalidate = 600; // news freshness — 10 min; briefing is independently cached for 12h
+
 export const metadata: Metadata = {
   title: "MERIDIAN — Daily Intelligence Brief",
   description:

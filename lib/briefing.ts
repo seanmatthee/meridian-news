@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { unstable_cache } from "next/cache";
 import { getTopHeadlines, type NewsItem } from "./feeds";
 
 const SYSTEM_PROMPT = `You write a 250–350 word daily briefing for an investor and founder based in South Africa. Editorial tone, no fluff, no marketing language. Lead with what changed. Cover global markets, AI, geopolitics, and any major SA-specific event. End with three short imperative bullets under a 'Today's focus' header.
@@ -101,3 +102,9 @@ Today's focus
 • Review each lane for breaking developments across your five intelligence domains.
 • Watch for cross-domain patterns — market moves often correlate with geopolitical shifts.`;
 }
+
+export const getCachedBriefing = unstable_cache(
+  generateBriefing,
+  ["daily-briefing"],
+  { revalidate: 43200, tags: ["briefing"] }
+);

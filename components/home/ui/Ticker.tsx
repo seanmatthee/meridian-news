@@ -9,7 +9,7 @@
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 // 3. Internal
-import { formatSAST, formatHeroDate } from "@/lib/utils";
+import { LiveDateTime } from "@/components/home/ui/LiveDateTime";
 
 // ─── TYPES ───────────────────────────────────────
 export interface TickerItem {
@@ -54,9 +54,6 @@ function TickerValue({ item }: { item: TickerItem }) {
 
 // ─── COMPONENT ───────────────────────────────────
 export function Ticker({ items }: TickerProps) {
-  const now = new Date();
-  const dateStr = formatHeroDate(now);
-  const timeStr = formatSAST(now);
   const tickers = items ?? FALLBACK_TICKERS;
 
   // ─── RENDER ────────────────────────────────────
@@ -66,7 +63,7 @@ export function Ticker({ items }: TickerProps) {
       className="sticky top-0 z-50 h-8 border-b border-border bg-white"
     >
       <div className="flex h-full items-center max-w-[100vw] overflow-hidden">
-        {/* Date + Time — always visible */}
+        {/* Date + Time — live client island */}
         <div
           className="
             shrink-0 flex items-center gap-3
@@ -75,9 +72,7 @@ export function Ticker({ items }: TickerProps) {
             border-r border-border
           "
         >
-          <span>{dateStr}</span>
-          <span className="hidden sm:inline text-border">|</span>
-          <span className="hidden sm:inline">{timeStr}</span>
+          <LiveDateTime />
         </div>
 
         {/* Desktop: static row */}

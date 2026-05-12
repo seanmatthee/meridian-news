@@ -5,16 +5,13 @@
  */
 
 // 3. Internal
-import { generateBriefing } from "@/lib/briefing";
+import { getCachedBriefing } from "@/lib/briefing";
 import { formatBriefingDate } from "@/lib/utils";
-
-// ─── CONSTANTS ───────────────────────────────────
-export const revalidate = 1800; // 30 minutes
 
 // ─── COMPONENT ───────────────────────────────────
 export async function Briefing() {
   // ─── HOOKS & DATA ──────────────────────────────
-  const briefing = await generateBriefing();
+  const briefing = await getCachedBriefing();
   const dateStr = formatBriefingDate(new Date());
 
   // ─── DERIVED ───────────────────────────────────
