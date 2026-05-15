@@ -77,11 +77,27 @@ export function Hero() {
 
           {/* Date strip */}
           <p
-            className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground mt-2"
+            className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground mt-2 mb-8"
             suppressHydrationWarning
           >
             {dateStr}
           </p>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-6 pointer-events-auto">
+            <a
+              href="/briefing"
+              className="px-8 py-4 bg-foreground text-background font-mono text-sm uppercase tracking-widest hover:bg-foreground/90 transition-colors"
+            >
+              The World
+            </a>
+            <a
+              href="/my-world"
+              className="px-8 py-4 border border-foreground text-foreground font-mono text-sm uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors"
+            >
+              My World
+            </a>
+          </div>
         </div>
       </DotGlobeHero>
     </section>

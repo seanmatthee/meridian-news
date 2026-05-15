@@ -35,16 +35,24 @@ export function OrbitingGlobes() {
             }
           >
             <div className="orbit-counter">
-              <Link
-                href={o.href}
-                aria-label={`Open ${o.label}`}
-                className="orbit-link pointer-events-auto"
+              <div
+                style={
+                  o.label === "The World"
+                    ? { transform: "rotate(180deg)" }
+                    : undefined
+                }
               >
-                <span className="orbit-globe">
-                  <MiniGlobe />
-                </span>
-                <span className="orbit-label">{o.label}</span>
-              </Link>
+                <Link
+                  href={o.href}
+                  aria-label={`Open ${o.label}`}
+                  className="orbit-link pointer-events-auto"
+                >
+                  <span className="orbit-globe">
+                    <MiniGlobe />
+                  </span>
+                  <span className="orbit-label">{o.label}</span>
+                </Link>
+              </div>
             </div>
           </div>
         ))}

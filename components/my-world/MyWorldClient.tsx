@@ -191,124 +191,179 @@ export function MyWorldClient() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-6 md:px-10 py-12 md:py-16">
-      <div className="mb-8">
-        <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-2">
-          MY WORLD
-        </p>
-        <h1 className="font-serif font-semibold text-3xl md:text-4xl text-foreground leading-tight">
-          Tell Meridian what you want to know.
-        </h1>
-        <p className="font-serif italic text-[15px] md:text-base text-muted-foreground mt-2">
-          A self-hosted intelligence assistant. Your queries stay on your device and ours.
-        </p>
-      </div>
-
-      <Hairline />
-
-      {!historyLoading && history.length === 0 && !pending && (
-        <div className="py-10">
-          <p className="font-sans text-[15px] text-foreground leading-relaxed mb-5">
-            Ask in plain language. Meridian routes your query to the right outlets
-            and topics, fetches today&rsquo;s coverage, and writes you a tight
-            summary built only from those sources.
+    <div className="flex flex-col md:flex-row h-[calc(100vh-4.5rem)]">
+      {/* Left Sidebar */}
+      <aside className="w-full md:w-[320px] shrink-0 border-r border-border flex flex-col overflow-y-auto bg-secondary/30">
+        <div className="p-6">
+          <Eyebrow className="block mb-3">Daily AI Filter</Eyebrow>
+          <p className="font-sans text-[13px] text-muted-foreground mb-3 leading-relaxed">
+            Tell Meridian what you want to read each morning. Your selected categories will appear as an AI summary every 24 hours.
           </p>
-          <Eyebrow className="block mb-3">Try one</Eyebrow>
-          <div className="flex flex-col gap-2">
-            {EXAMPLE_QUERIES.map((q) => (
-              <button
-                key={q}
-                type="button"
-                onClick={() => submit(q)}
-                className="group text-left flex items-center justify-between gap-3 px-4 py-3 border border-border rounded-md hover:border-accent transition-colors"
-              >
-                <span className="font-sans text-[14px] text-foreground group-hover:text-accent transition-colors">
-                  {q}
-                </span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground group-hover:text-accent transition-colors">
-                  ASK →
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {history.length > 0 && (
-        <div className="py-6 flex flex-col gap-10">
-          {history.map((h) => (
-            <Exchange
-              key={h.queryId}
-              item={h}
-              articles={articlesByQuery[h.queryId]}
-            />
-          ))}
-        </div>
-      )}
-
-      {pending && (
-        <div className="py-6">
-          <div className="mb-3">
-            <Eyebrow className="block mb-1">YOU</Eyebrow>
-            <p className="font-serif text-[17px] text-foreground leading-snug">
-              {pending.rawText}
-            </p>
-          </div>
-          {pending.loading && (
-            <div className="mt-4">
-              <Eyebrow className="block mb-1">MERIDIAN AI</Eyebrow>
-              <p className="font-sans text-[14px] text-muted-foreground italic">
-                Routing your query… reading the feeds… composing.
-              </p>
-            </div>
-          )}
-          {pending.error && (
-            <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-destructive mt-3">
-              {pending.error}
-            </p>
-          )}
-        </div>
-      )}
-
-      <div ref={bottomRef} />
-
-      <form
-        onSubmit={onSubmit}
-        className="sticky bottom-0 bg-white border-t border-border pt-4 mt-8"
-      >
-        <div className="flex items-end gap-2">
           <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Ask Meridian…"
-            rows={2}
-            className="flex-1 resize-none rounded-md border border-border px-4 py-3 font-sans text-[15px] text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+            placeholder="e.g. JSE updates, Global AI policy, Tech earnings..."
+            rows={3}
+            className="w-full resize-none rounded-md border border-border px-3 py-2 font-sans text-[13px] text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent mb-2"
           />
           <button
-            type="submit"
-            disabled={!input.trim() || !sessionId || pending?.loading}
-            className="h-12 px-4 rounded-md bg-accent text-accent-foreground font-mono text-[11px] uppercase tracking-[0.1em] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
+            type="button"
+            className="w-full h-9 rounded-md bg-foreground text-background font-mono text-[10px] uppercase tracking-[0.1em] hover:bg-foreground/90 transition-colors"
           >
-            Ask
+            Save Filter
           </button>
         </div>
-        <div className="flex items-center justify-between mt-2">
-          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-            Enter to send · Shift+Enter for newline
-          </p>
-          {history.length > 0 && (
-            <button
-              type="button"
-              onClick={clearHistory}
-              className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground hover:text-destructive transition-colors"
-            >
-              Clear history
-            </button>
+
+        <Hairline />
+
+        <div className="p-6 flex-1">
+          <div className="flex items-center justify-between mb-4">
+            <Eyebrow className="block">Chat History</Eyebrow>
+            {history.length > 0 && (
+              <button
+                type="button"
+                onClick={clearHistory}
+                className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground hover:text-destructive transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {historyLoading ? (
+            <p className="font-sans text-[13px] italic text-muted-foreground">Loading...</p>
+          ) : history.length === 0 ? (
+            <p className="font-sans text-[13px] italic text-muted-foreground">No recent chats.</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {history.map((h) => (
+                <li key={h.queryId}>
+                  <button
+                    type="button"
+                    className="text-left w-full truncate font-sans text-[13px] text-foreground hover:text-accent transition-colors"
+                  >
+                    {h.rawText}
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-      </form>
+      </aside>
+
+      {/* Main Chat Area */}
+      <main className="flex-1 flex flex-col relative bg-background overflow-hidden">
+        <div className="flex-1 overflow-y-auto px-6 md:px-10 py-12 md:py-16">
+          <div className="max-w-3xl mx-auto">
+            <div className="mb-8 text-center">
+              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                MY WORLD
+              </p>
+              <h1 className="font-serif font-semibold text-3xl md:text-4xl text-foreground leading-tight">
+                Tell Meridian what you want to know.
+              </h1>
+              <p className="font-serif italic text-[15px] md:text-base text-muted-foreground mt-2">
+                A self-hosted intelligence assistant. Your queries stay on your device and ours.
+              </p>
+            </div>
+
+            <Hairline className="mb-10" />
+
+            {!historyLoading && history.length === 0 && !pending && (
+              <div className="py-10 text-center">
+                <p className="font-sans text-[15px] text-foreground leading-relaxed mb-8 max-w-xl mx-auto">
+                  Ask in plain language. Meridian routes your query to the right outlets
+                  and topics, fetches today&rsquo;s coverage, and writes you a tight
+                  summary built only from those sources.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  {EXAMPLE_QUERIES.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => submit(q)}
+                      className="group text-left flex flex-col justify-between gap-3 px-4 py-3 border border-border rounded-md hover:border-accent transition-colors w-full sm:w-64"
+                    >
+                      <span className="font-sans text-[14px] text-foreground group-hover:text-accent transition-colors">
+                        {q}
+                      </span>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground group-hover:text-accent transition-colors">
+                        ASK →
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {history.length > 0 && (
+              <div className="py-6 flex flex-col gap-10">
+                {history.map((h) => (
+                  <Exchange
+                    key={h.queryId}
+                    item={h}
+                    articles={articlesByQuery[h.queryId]}
+                  />
+                ))}
+              </div>
+            )}
+
+            {pending && (
+              <div className="py-6 border-t border-border mt-6 pt-6">
+                <div className="mb-3">
+                  <Eyebrow className="block mb-1">YOU</Eyebrow>
+                  <p className="font-serif text-[17px] text-foreground leading-snug">
+                    {pending.rawText}
+                  </p>
+                </div>
+                {pending.loading && (
+                  <div className="mt-4">
+                    <Eyebrow className="block mb-1">MERIDIAN AI</Eyebrow>
+                    <p className="font-sans text-[14px] text-muted-foreground italic">
+                      Routing your query… reading the feeds… composing.
+                    </p>
+                  </div>
+                )}
+                {pending.error && (
+                  <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-destructive mt-3">
+                    {pending.error}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div ref={bottomRef} className="h-24" />
+          </div>
+        </div>
+
+        {/* Sticky Input */}
+        <div className="absolute bottom-0 left-0 right-0 bg-background border-t border-border px-6 py-4">
+          <div className="max-w-3xl mx-auto">
+            <form onSubmit={onSubmit} className="relative">
+              <div className="flex flex-col gap-2">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder="Ask Meridian…"
+                  rows={2}
+                  className="w-full resize-none rounded-md border border-border px-4 py-3 font-sans text-[15px] text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                />
+                <div className="flex items-center justify-between">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                    Enter to send · Shift+Enter for newline
+                  </p>
+                  <button
+                    type="submit"
+                    disabled={!input.trim() || !sessionId || pending?.loading}
+                    className="h-10 px-6 rounded-md bg-foreground text-background font-mono text-[11px] uppercase tracking-[0.1em] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-foreground/90 transition-colors"
+                  >
+                    Ask
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

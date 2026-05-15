@@ -40,7 +40,7 @@ export async function Briefing() {
       <div className="max-w-7xl mx-auto px-6 md:px-10 py-14 md:py-20">
         {/* Eyebrow */}
         <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-4">
-          BRIEFING · <LiveDate />
+          BRIEFING · <LiveDate /> <span className="mx-2">|</span> <span className="font-semibold">SUMMARIZED BY MERIDIAN AI</span>
         </p>
 
         {/* Headline */}
