@@ -1,5 +1,14 @@
 [phases.setup]
 nixPkgs = ["nodejs_20", "npm-10_x"]
 
+[phases.install]
+cmds = ["npm ci --include=dev --no-audit --no-fund"]
+
+[phases.build]
+cmds = ["npm run build"]
+
 [variables]
 NIXPACKS_NODE_VERSION = "20"
+# Keep dev deps in the build image — Tailwind/TS toolchain is needed
+# at build time but stripped from the runtime image by Nixpacks.
+NPM_CONFIG_PRODUCTION = "false"
