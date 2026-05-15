@@ -1,7 +1,7 @@
 /**
  * DotGlobe — Three.js wireframe sphere that serves as the ambient hero backdrop.
  * Renders a rotating icosphere with configurable speed and radius.
- * Accepts children (e.g. GlobePulses) inside the rotating group.
+ * Accepts children (e.g. centered wordmark) inside the rotating group.
  * Used by: components/home/sections/Hero.tsx
  */
 "use client";
@@ -23,6 +23,8 @@ export interface DotGlobeProps {
   globeRadius?: number;
   className?: string;
   children?: React.ReactNode;
+  /** Optional DOM overlay layered above the canvas, beneath the centered children. */
+  overlay?: React.ReactNode;
 }
 
 interface GlobeProps {
@@ -63,22 +65,30 @@ export function DotGlobe({
   globeRadius = 1,
   className,
   children,
+  overlay,
 }: DotGlobeProps) {
   return (
     <div className={cn("relative w-full bg-white overflow-hidden", className)}>
-      <div className="relative z-10 flex flex-col items-center justify-center h-full">
-        {children}
-      </div>
+      {/* WebGL canvas — z-0, doesn't intercept pointer events */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <Canvas dpr={[1, 1.5]}>
           <PerspectiveCamera makeDefault position={[0, 0, 3]} fov={75} />
           <ambientLight intensity={0.5} />
           <pointLight position={[10, 10, 10]} intensity={1} />
-          <Globe
-            rotationSpeed={rotationSpeed}
-            radius={globeRadius}
-          />
+          <Globe rotationSpeed={rotationSpeed} radius={globeRadius} />
         </Canvas>
+      </div>
+
+      {/* DOM overlay layer for orbiters, etc. */}
+      {overlay && (
+        <div className="absolute inset-0 z-10 pointer-events-none">
+          {overlay}
+        </div>
+      )}
+
+      {/* Centered hero content (wordmark etc.) */}
+      <div className="relative z-20 flex flex-col items-center justify-center h-full">
+        {children}
       </div>
     </div>
   );

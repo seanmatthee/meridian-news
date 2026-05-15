@@ -1,0 +1,86 @@
+// Meridian — Prisma schema
+//
+// Local development: SQLite at ./prisma/dev.db (binary file, gitignored).
+// Production upgrade path: change `provider` to "postgresql" and set DATABASE_URL
+// to a Postgres connection string. The model definitions below are identical
+// across providers — only the connection changes. Run `npx prisma migrate deploy`
+// after the swap; embeddings (Bytes column) port over without conversion.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Source {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  slug        String    @unique
+  url         String
+  rssUrl      String?
+  region      String
+  category    String
+  description String
+  embedding   Bytes
+  articles    Article[]
+  createdAt   DateTime  @default(now())
+}
+
+model Topic {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  slug        String   @unique
+  description String
+  parentId    Int?
+  parent      Topic?   @relation("TopicHierarchy", fields: [parentId], references: [id])
+  children    Topic[]  @relation("TopicHierarchy")
+  embedding   Bytes
+  createdAt   DateTime @default(now())
+}
+
+model Article {
+  id          Int      @id @default(autoincrement())
+  sourceId    Int
+  source      Source   @relation(fields: [sourceId], references: [id])
+  title       String
+  url         String   @unique
+  content     String
+  publishedAt DateTime
+  embedding   Bytes?
+  createdAt   DateTime @default(now())
+
+  @@index([sourceId, publishedAt])
+}
+
+model UserSession {
+  id        String      @id
+  createdAt DateTime    @default(now())
+  queries   UserQuery[]
+}
+
+model UserQuery {
+  id                Int          @id @default(autoincrement())
+  sessionId         String
+  session           UserSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  rawText           String
+  interpretedIntent String
+  summaryId         Int?
+  summary           UserSummary? @relation(fields: [summaryId], references: [id])
+  createdAt         DateTime     @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+model UserSummary {
+  id          Int         @id @default(autoincrement())
+  queryHash   String      @unique
+  summaryText String
+  mode        String
+  length      String
+  articleIds  String
+  createdAt   DateTime    @default(now())
+  queries     UserQuery[]
+}

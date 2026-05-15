@@ -6,13 +6,12 @@
 
 // 3. Internal
 import { getCachedBriefing } from "@/lib/briefing";
-import { formatBriefingDate } from "@/lib/utils";
+import { LiveDate } from "@/components/shared/LiveDate";
 
 // ─── COMPONENT ───────────────────────────────────
 export async function Briefing() {
   // ─── HOOKS & DATA ──────────────────────────────
   const briefing = await getCachedBriefing();
-  const dateStr = formatBriefingDate(new Date());
 
   // ─── DERIVED ───────────────────────────────────
   // Parse the briefing content into paragraphs and the focus section
@@ -41,7 +40,7 @@ export async function Briefing() {
       <div className="max-w-7xl mx-auto px-6 md:px-10 py-14 md:py-20">
         {/* Eyebrow */}
         <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-4">
-          BRIEFING · {dateStr}
+          BRIEFING · <LiveDate />
         </p>
 
         {/* Headline */}

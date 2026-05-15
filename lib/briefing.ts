@@ -1,15 +1,14 @@
-import Anthropic from "@anthropic-ai/sdk";
+/**
+ * briefing.ts — daily editorial briefing, powered by Meridian AI.
+ *
+ * Replaces the previous Anthropic-backed implementation. Now runs entirely
+ * on the self-hosted summarizer (transformers.js, local models). No external
+ * LLM API calls; no per-token cost.
+ */
 import { unstable_cache } from "next/cache";
 import { getTopHeadlines, type NewsItem } from "./feeds";
-
-const SYSTEM_PROMPT = `You write a 250–350 word daily briefing for an investor and founder based in South Africa. Editorial tone, no fluff, no marketing language. Lead with what changed. Cover global markets, AI, geopolitics, and any major SA-specific event. End with three short imperative bullets under a 'Today's focus' header.
-
-Format your response as follows:
-- Number each paragraph (1. 2. 3. etc.)
-- Start each paragraph with a **bold one-line claim** followed by 2 sentences explaining significance and implication.
-- End with a "Today's focus" section with exactly 3 bullet points, each a single imperative sentence.
-
-Do not use markdown headers. Just use the numbered format and bold text. Keep it tight and editorial.`;
+import { summarize } from "./meridian-ai";
+import type { ArticleInput } from "./meridian-ai";
 
 export interface BriefingData {
   content: string;
@@ -17,61 +16,116 @@ export interface BriefingData {
   headlineCount: number;
 }
 
+const PARAGRAPH_LEADS: Array<{ category: NewsItem["category"]; lead: string }> = [
+  { category: "world", lead: "Across the wires today" },
+  { category: "business", lead: "On the business desk" },
+  { category: "finance", lead: "In the markets" },
+  { category: "ai", lead: "Inside AI and tech" },
+  { category: "south-africa", lead: "From South Africa" },
+];
+
+function headlinesToArticles(headlines: NewsItem[]): ArticleInput[] {
+  return headlines.map((h) => ({
+    title: h.title,
+    content: h.description ?? h.title,
+    source: h.source,
+    url: h.url,
+    publishedAt: h.publishedAt,
+  }));
+}
+
+function focusBullet(item: NewsItem): string {
+  const title = item.title.replace(/\.+$/, "").trim();
+  return `${title} (${item.source}).`;
+}
+
 /**
- * Generate an AI-powered daily briefing from top headlines.
- * Falls back to a static message if the API key is missing or the call fails.
+ * Build the editorial briefing.
+ * Composes per-category extractive summaries into the numbered, bold-led
+ * paragraph format that Briefing.tsx already parses.
  */
+async function buildBriefingContent(headlines: NewsItem[]): Promise<string> {
+  const parts: string[] = [];
+  let n = 1;
+
+  for (const { category, lead } of PARAGRAPH_LEADS) {
+    const slice = headlines.filter((h) => h.category === category).slice(0, 4);
+    if (slice.length === 0) continue;
+
+    let summary = "";
+    try {
+      const result = await summarize({
+        articles: headlinesToArticles(slice),
+        mode: "extractive",
+        length: "short",
+      });
+      summary = result.summary.trim();
+    } catch (err) {
+      console.error(`[briefing] ${category} summary failed:`, err);
+      summary = slice
+        .slice(0, 2)
+        .map((h) => h.title)
+        .join(". ");
+    }
+
+    if (!summary) continue;
+    parts.push(`${n}. **${lead}.** ${summary}`);
+    n++;
+  }
+
+  // Focus bullets — three highest-priority items across all categories.
+  const focusItems = pickFocus(headlines);
+  parts.push("Today's focus");
+  for (const item of focusItems) parts.push(`• ${focusBullet(item)}`);
+
+  return parts.join("\n\n");
+}
+
+function pickFocus(headlines: NewsItem[]): NewsItem[] {
+  const byTriangulation = [...headlines].sort(
+    (a, b) =>
+      (b.triangulationCount ?? 1) - (a.triangulationCount ?? 1) ||
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+  );
+  const seenCats = new Set<string>();
+  const out: NewsItem[] = [];
+  for (const h of byTriangulation) {
+    if (seenCats.has(h.category)) continue;
+    seenCats.add(h.category);
+    out.push(h);
+    if (out.length >= 3) break;
+  }
+  if (out.length < 3) {
+    for (const h of byTriangulation) {
+      if (out.includes(h)) continue;
+      out.push(h);
+      if (out.length >= 3) break;
+    }
+  }
+  return out;
+}
+
 export async function generateBriefing(): Promise<BriefingData> {
   const headlines = await getTopHeadlines();
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (headlines.length === 0) {
     return {
-      content: getFallbackBriefing(headlines),
+      content:
+        "1. **Meridian is reaching its sources.** Feeds are temporarily unavailable. The briefing will return as soon as the wires recover.\n\nToday's focus\n• Stand by — Meridian is reconnecting.",
       generatedAt: new Date().toISOString(),
-      headlineCount: headlines.length,
+      headlineCount: 0,
     };
   }
 
   try {
-    const client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
-
-    const headlineText = headlines
-      .map(
-        (h, i) =>
-          `${i + 1}. [${h.category.toUpperCase()}] ${h.title} (${h.source})`
-      )
-      .join("\n");
-
-    const message = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      system: [
-        {
-          type: "text",
-          text: SYSTEM_PROMPT,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: [
-        {
-          role: "user",
-          content: `Here are today's top ${headlines.length} headlines across AI, world news, business, finance, and South Africa:\n\n${headlineText}\n\nWrite the daily briefing.`,
-        },
-      ],
-    });
-
-    const textContent = message.content.find((c) => c.type === "text");
-    const briefingText = textContent?.text ?? getFallbackBriefing(headlines);
-
+    const content = await buildBriefingContent(headlines);
     return {
-      content: briefingText,
+      content,
       generatedAt: new Date().toISOString(),
       headlineCount: headlines.length,
     };
-  } catch (error) {
-    console.error("[briefing] Anthropic API error:", error);
+  } catch (err) {
+    console.error("[briefing] generation failed:", err);
     return {
       content: getFallbackBriefing(headlines),
       generatedAt: new Date().toISOString(),
@@ -80,31 +134,17 @@ export async function generateBriefing(): Promise<BriefingData> {
   }
 }
 
-/**
- * Fallback briefing when API is unavailable.
- */
 function getFallbackBriefing(headlines: NewsItem[]): string {
-  const categoryCounts: Record<string, number> = {};
-  for (const h of headlines) {
-    categoryCounts[h.category] = (categoryCounts[h.category] || 0) + 1;
-  }
-
   const topHeadlines = headlines.slice(0, 5);
-
-  return `1. **Meridian is aggregating ${headlines.length} stories across five intelligence lanes today.** The briefing engine requires an Anthropic API key to generate AI-powered analysis. Connect your key in .env.local to activate daily intelligence summaries.
-
-2. **Today's signal spans ${Object.keys(categoryCounts).length} domains.** ${topHeadlines.map((h) => h.title).join(". ")}. Each lane surfaces the most recent developments from trusted editorial sources.
-
-3. **The full briefing will synthesize cross-domain trends and surface what matters most.** Once configured, Meridian generates a 250–350 word editorial briefing every 30 minutes, covering global markets, AI developments, geopolitical shifts, and South African affairs.
-
-Today's focus
-• Configure your ANTHROPIC_API_KEY in .env.local to activate AI-generated briefings.
-• Review each lane for breaking developments across your five intelligence domains.
-• Watch for cross-domain patterns — market moves often correlate with geopolitical shifts.`;
+  const titles = topHeadlines.map((h) => h.title).join(". ");
+  return `1. **Meridian is aggregating ${headlines.length} stories across five intelligence lanes today.** ${titles}. Meridian AI is composing the editorial briefing in the background.\n\nToday's focus\n${topHeadlines
+    .slice(0, 3)
+    .map((h) => `• ${focusBullet(h)}`)
+    .join("\n")}`;
 }
 
 export const getCachedBriefing = unstable_cache(
   generateBriefing,
   ["daily-briefing"],
-  { revalidate: 43200, tags: ["briefing"] }
+  { revalidate: 43200, tags: ["briefing"] },
 );

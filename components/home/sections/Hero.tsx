@@ -1,6 +1,6 @@
 /**
  * Hero — The main ambient hero section of the landing page.
- * Renders the wireframe globe, wordmark, and current date.
+ * Renders the wireframe globe, two orbiting mini globes, wordmark, and date.
  * Used by: app/page.tsx
  */
 "use client";
@@ -11,9 +11,7 @@ import dynamic from "next/dynamic";
 // 3. Internal
 import { formatHeroDate } from "@/lib/utils";
 import { CyclingTagline } from "@/components/home/ui/CyclingTagline";
-
-// ─── TYPES ───────────────────────────────────────
-interface HeroProps {}
+import { OrbitingGlobes } from "@/components/home/ui/OrbitingGlobes";
 
 // ─── CONSTANTS ───────────────────────────────────
 const DotGlobeHero = dynamic(
@@ -25,7 +23,7 @@ const DotGlobeHero = dynamic(
     ssr: false,
     loading: () => (
       <div
-        style={{ height: "85vh" }}
+        style={{ height: "calc(100vh - 4.5rem)" }}
         className="bg-white flex items-center justify-center"
       >
         <div className="flex flex-col items-center justify-center gap-6 px-6">
@@ -42,18 +40,23 @@ const DotGlobeHero = dynamic(
 );
 
 // ─── COMPONENT ───────────────────────────────────
-export function Hero({}: HeroProps) {
+export function Hero() {
   // ─── DERIVED ───────────────────────────────────
   const now = new Date();
   const dateStr = formatHeroDate(now);
 
   // ─── RENDER ────────────────────────────────────
   return (
-    <section id="hero" aria-labelledby="hero-title">
+    <section
+      id="hero"
+      aria-labelledby="hero-title"
+      className="relative"
+    >
       <DotGlobeHero
         rotationSpeed={0.0025}
         globeRadius={1.4}
-        className="h-[85vh] min-h-[600px]"
+        className="h-[calc(100vh-4.5rem)] min-h-[600px]"
+        overlay={<OrbitingGlobes />}
       >
         <div className="flex flex-col items-center justify-center gap-4 md:gap-6 px-6 text-center select-none">
           {/* Eyebrow */}
