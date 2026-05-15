@@ -31,11 +31,20 @@ import { warmupEmbedder } from "./embeddings";
 import { warmupSummarizer } from "./summarize/abstractive";
 
 /**
- * Pre-load both models so the first real request doesn't pay the cold-start cost.
+ * Pre-load models so the first real request doesn't pay the cold-start cost.
  * Returns elapsed time in ms.
+ *
+ * By default only the small (~25MB) embedding model is loaded. Set
+ * MERIDIAN_AI_WARM_ABSTRACTIVE=1 to also load the ~88MB distilbart model
+ * at boot. On 1GB-RAM hosts (Railway Trial) leave it off and let the
+ * abstractive model load lazily on first request.
  */
 export async function warmup(): Promise<number> {
   const t0 = Date.now();
-  await Promise.all([warmupEmbedder(), warmupSummarizer()]);
+  const tasks: Promise<unknown>[] = [warmupEmbedder()];
+  if (process.env.MERIDIAN_AI_WARM_ABSTRACTIVE === "1") {
+    tasks.push(warmupSummarizer());
+  }
+  await Promise.all(tasks);
   return Date.now() - t0;
 }
