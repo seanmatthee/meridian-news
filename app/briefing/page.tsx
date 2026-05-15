@@ -3,7 +3,11 @@ import { StockBandRow } from "@/components/home/ui/StockBandRow";
 import { Briefing } from "@/components/home/sections/Briefing";
 import { NewsGrid } from "@/components/home/sections/NewsGrid";
 
-export const revalidate = 600; // news freshness — 10 min; briefing is independently cached for 12h
+// Dynamic: this page reads from Postgres (UserSummary cache) and runs
+// transformers.js at request time. Static prerendering would happen before
+// migrations run on first deploy. The Briefing itself is cached via
+// unstable_cache for 12h; news feeds are cached for 10m.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "The World — MERIDIAN",

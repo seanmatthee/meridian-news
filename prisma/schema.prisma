@@ -1,17 +1,16 @@
 // Meridian — Prisma schema
 //
-// Local development: SQLite at ./prisma/dev.db (binary file, gitignored).
-// Production upgrade path: change `provider` to "postgresql" and set DATABASE_URL
-// to a Postgres connection string. The model definitions below are identical
-// across providers — only the connection changes. Run `npx prisma migrate deploy`
-// after the swap; embeddings (Bytes column) port over without conversion.
+// Provider: Postgres. DATABASE_URL is provided by the host (Railway, Neon,
+// Supabase, etc.). For purely local exploration you can swap `provider` to
+// "sqlite" and set DATABASE_URL to "file:./dev.db" — the model definitions
+// are provider-agnostic. Run `npx prisma migrate deploy` after the swap.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

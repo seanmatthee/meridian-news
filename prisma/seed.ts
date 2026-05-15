@@ -276,12 +276,30 @@ const TOPICS: TopicSeed[] = [
 ];
 
 async function main(): Promise<void> {
-  console.log("[seed] embedding model warmup...");
-  // Trigger model download/load once before the loops.
+  // Fast-path: if every Source and Topic is already present, skip the model
+  // load entirely. Makes redeploys cheap (no model download, no re-embed).
+  const [existingSources, existingTopics] = await Promise.all([
+    prisma.source.findMany({ select: { slug: true } }),
+    prisma.topic.findMany({ select: { slug: true } }),
+  ]);
+  const haveSourceSlugs = new Set(existingSources.map((s: { slug: string }) => s.slug));
+  const haveTopicSlugs = new Set(existingTopics.map((t: { slug: string }) => t.slug));
+  const missingSources = SOURCES.filter((s) => !haveSourceSlugs.has(s.slug));
+  const missingTopics = TOPICS.filter((t) => !haveTopicSlugs.has(t.slug));
+
+  if (missingSources.length === 0 && missingTopics.length === 0) {
+    console.log(
+      `[seed] up-to-date — ${existingSources.length} sources, ${existingTopics.length} topics already present.`,
+    );
+    return;
+  }
+
+  console.log(
+    `[seed] missing: ${missingSources.length} sources, ${missingTopics.length} topics — loading embedding model...`,
+  );
   await embed("warmup");
 
-  console.log(`[seed] upserting ${SOURCES.length} sources...`);
-  for (const s of SOURCES) {
+  for (const s of missingSources) {
     const vec = await embed(s.description);
     const buf = bufferFromVector(vec);
     await prisma.source.upsert({
@@ -289,11 +307,10 @@ async function main(): Promise<void> {
       create: { ...s, embedding: buf },
       update: { ...s, embedding: buf },
     });
-    console.log(`  ✓ ${s.name}`);
+    console.log(`  ✓ source: ${s.name}`);
   }
 
-  console.log(`[seed] upserting ${TOPICS.length} topics...`);
-  for (const t of TOPICS) {
+  for (const t of missingTopics) {
     const vec = await embed(t.description);
     const buf = bufferFromVector(vec);
     await prisma.topic.upsert({
@@ -301,7 +318,7 @@ async function main(): Promise<void> {
       create: { ...t, embedding: buf },
       update: { ...t, embedding: buf },
     });
-    console.log(`  ✓ ${t.name}`);
+    console.log(`  ✓ topic: ${t.name}`);
   }
 
   // Verify a non-zero embedding shape on one row of each table.
