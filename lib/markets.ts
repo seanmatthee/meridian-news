@@ -1,4 +1,4 @@
-import type { TickerItem } from "@/components/home/ui/Ticker";
+import type { TickerItem } from "@/components/layout/Ticker";
 import { fetchWithBrowserHeaders, getLastGood, setLastGood } from "./fetch";
 
 interface TickerConfig {

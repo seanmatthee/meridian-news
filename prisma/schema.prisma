@@ -54,10 +54,52 @@ model Article {
   @@index([sourceId, publishedAt])
 }
 
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  passwordHash  String
+  emailVerified DateTime?
+  filter        String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  sessions      UserSession[]
+  dailyBriefs   DailyBrief[]
+}
+
+// One row per (user, calendar-day). Written by the cron job that fans out
+// the filter text through the same pipeline My World uses. Read by the
+// My World UI's "Today's Brief" panel.
+model DailyBrief {
+  id         Int      @id @default(autoincrement())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date       DateTime @db.Date
+  filterText String
+  summary    String
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model PendingUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  otpHash      String
+  otpExpiresAt DateTime
+  attempts     Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
 model UserSession {
   id        String      @id
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime    @default(now())
   queries   UserQuery[]
+
+  @@index([userId])
 }
 
 model UserQuery {
@@ -71,6 +113,17 @@ model UserQuery {
   createdAt         DateTime     @default(now())
 
   @@index([sessionId, createdAt])
+}
+
+model AuthSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
 }
 
 model UserSummary {

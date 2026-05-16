@@ -1,14 +1,14 @@
 /**
- * briefing.ts — daily editorial briefing, powered by Meridian AI.
+ * briefing.ts — daily editorial briefing, powered by DeepSeek.
  *
- * Replaces the previous Anthropic-backed implementation. Now runs entirely
- * on the self-hosted summarizer (transformers.js, local models). No external
- * LLM API calls; no per-token cost.
+ * Cached for 12h via unstable_cache, so the LLM runs at most twice a day
+ * regardless of traffic. Falls back to a headline-list briefing if the
+ * LLM is unavailable or returns empty content.
  */
 import { unstable_cache } from "next/cache";
 import { getTopHeadlines, type NewsItem } from "./feeds";
-import { summarize } from "./meridian-ai";
 import type { ArticleInput } from "./meridian-ai";
+import { composeBriefing, type BriefingLane } from "./deepseek/analyze";
 
 export interface BriefingData {
   content: string;
@@ -16,12 +16,12 @@ export interface BriefingData {
   headlineCount: number;
 }
 
-const PARAGRAPH_LEADS: Array<{ category: NewsItem["category"]; lead: string }> = [
-  { category: "world", lead: "Across the wires today" },
-  { category: "business", lead: "On the business desk" },
-  { category: "finance", lead: "In the markets" },
-  { category: "ai", lead: "Inside AI and tech" },
-  { category: "south-africa", lead: "From South Africa" },
+const LANE_HEADINGS: Array<{ category: NewsItem["category"]; heading: string }> = [
+  { category: "world", heading: "Across the wires" },
+  { category: "business", heading: "On the business desk" },
+  { category: "finance", heading: "In the markets" },
+  { category: "ai", heading: "Inside AI and tech" },
+  { category: "south-africa", heading: "From South Africa" },
 ];
 
 function headlinesToArticles(headlines: NewsItem[]): ArticleInput[] {
@@ -40,69 +40,29 @@ function focusBullet(item: NewsItem): string {
 }
 
 /**
- * Build the editorial briefing.
- * Composes per-category extractive summaries into the numbered, bold-led
- * paragraph format that Briefing.tsx already parses.
+ * Build the editorial briefing via DeepSeek. The system prompt locks the
+ * output format that Briefing.tsx parses (numbered bold-led paragraphs,
+ * then "Today's focus" with bullet items).
  */
 async function buildBriefingContent(headlines: NewsItem[]): Promise<string> {
-  const parts: string[] = [];
-  let n = 1;
+  const lanes: BriefingLane[] = LANE_HEADINGS.map(({ category, heading }) => ({
+    heading,
+    articles: headlinesToArticles(
+      headlines.filter((h) => h.category === category).slice(0, 5),
+    ),
+  })).filter((l) => l.articles.length > 0);
 
-  for (const { category, lead } of PARAGRAPH_LEADS) {
-    const slice = headlines.filter((h) => h.category === category).slice(0, 4);
-    if (slice.length === 0) continue;
-
-    let summary = "";
-    try {
-      const result = await summarize({
-        articles: headlinesToArticles(slice),
-        mode: "extractive",
-        length: "short",
-      });
-      summary = result.summary.trim();
-    } catch (err) {
-      console.error(`[briefing] ${category} summary failed:`, err);
-      summary = slice
-        .slice(0, 2)
-        .map((h) => h.title)
-        .join(". ");
-    }
-
-    if (!summary) continue;
-    parts.push(`${n}. **${lead}.** ${summary}`);
-    n++;
+  if (lanes.length === 0) {
+    throw new Error("no-lanes-with-content");
   }
 
-  // Focus bullets — three highest-priority items across all categories.
-  const focusItems = pickFocus(headlines);
-  parts.push("Today's focus");
-  for (const item of focusItems) parts.push(`• ${focusBullet(item)}`);
+  const today = new Date().toISOString().slice(0, 10);
+  const { text, stub } = await composeBriefing({ lanes, date: today });
 
-  return parts.join("\n\n");
-}
-
-function pickFocus(headlines: NewsItem[]): NewsItem[] {
-  const byTriangulation = [...headlines].sort(
-    (a, b) =>
-      (b.triangulationCount ?? 1) - (a.triangulationCount ?? 1) ||
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
-  const seenCats = new Set<string>();
-  const out: NewsItem[] = [];
-  for (const h of byTriangulation) {
-    if (seenCats.has(h.category)) continue;
-    seenCats.add(h.category);
-    out.push(h);
-    if (out.length >= 3) break;
+  if (stub || !text.trim()) {
+    return getFallbackBriefing(headlines);
   }
-  if (out.length < 3) {
-    for (const h of byTriangulation) {
-      if (out.includes(h)) continue;
-      out.push(h);
-      if (out.length >= 3) break;
-    }
-  }
-  return out;
+  return text;
 }
 
 export async function generateBriefing(): Promise<BriefingData> {
@@ -143,8 +103,10 @@ function getFallbackBriefing(headlines: NewsItem[]): string {
     .join("\n")}`;
 }
 
+// Cache key includes a version. Bump the suffix whenever the briefing
+// format / prompt changes so old cached output is treated as a miss.
 export const getCachedBriefing = unstable_cache(
   generateBriefing,
-  ["daily-briefing"],
+  ["daily-briefing-v2"],
   { revalidate: 43200, tags: ["briefing"] },
 );

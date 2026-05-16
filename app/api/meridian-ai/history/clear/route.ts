@@ -1,27 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
-  let body: { sessionId?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "invalid-json" }, { status: 400 });
-  }
-  const sessionId = body.sessionId?.trim();
-  if (!sessionId) {
-    return NextResponse.json({ error: "missing-session" }, { status: 400 });
+export async function POST() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
 
-  // Cascade-deletes the queries via the relation; the summaries remain so
-  // their cache benefit isn't lost.
-  const session = await prisma.userSession.findUnique({ where: { id: sessionId } });
-  if (!session) {
-    return NextResponse.json({ cleared: 0 });
-  }
-  const before = await prisma.userQuery.count({ where: { sessionId } });
-  await prisma.userSession.delete({ where: { id: sessionId } });
+  const before = await prisma.userQuery.count({ where: { sessionId: user.id } });
+  // Deleting the session cascades to its queries. Summaries remain so the
+  // cache benefit isn't lost across users.
+  await prisma.userSession.deleteMany({ where: { id: user.id } });
   return NextResponse.json({ cleared: before });
 }

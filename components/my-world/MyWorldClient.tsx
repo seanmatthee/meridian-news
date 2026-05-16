@@ -2,14 +2,15 @@
  * MyWorldClient — chat-style interface for Meridian AI.
  * Editorial styling, NOT generic chat-bot.
  *
- * - Session ID persisted in localStorage; loaded lazily on first render.
- * - On mount, fetches history for this session from the DB.
- * - Each ask hits /api/meridian-ai/ask which interprets, picks articles, summarizes, persists.
+ * - Requires a logged-in user (parent route enforces this).
+ * - On mount, fetches the user's saved query history from the DB.
+ * - Each ask hits /api/meridian-ai/ask which authenticates via session cookie.
  * - "Clear history" button with confirmation.
  */
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type {
   ArticleInput,
   HistoryItem,
@@ -17,13 +18,18 @@ import type {
 } from "@/lib/meridian-ai";
 import { Eyebrow } from "@/components/shared/Eyebrow";
 import { Hairline } from "@/components/shared/Hairline";
+import { DailyBriefPanel } from "./DailyBriefPanel";
 
-const STORAGE_KEY = "meridian:my-world:session";
 const EXAMPLE_QUERIES = [
   "Show me the latest from the JSE",
   "What's happening in AI this week?",
   "Catch me up on global politics",
 ];
+
+interface MyWorldClientProps {
+  initialFilter: string;
+  email: string;
+}
 
 interface PendingExchange {
   rawText: string;
@@ -44,49 +50,52 @@ type ArticlesByQuery = Record<
   Array<{ title: string; url: string; source: string }>
 >;
 
-function makeSessionId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-}
-
-function readOrCreateSessionId(): string {
-  if (typeof window === "undefined") return "";
-  let id = window.localStorage.getItem(STORAGE_KEY);
-  if (!id) {
-    id = makeSessionId();
-    window.localStorage.setItem(STORAGE_KEY, id);
-  }
-  return id;
-}
-
-export function MyWorldClient() {
-  // Lazy initializer — runs once at first render, no effect needed.
-  const [sessionId, setSessionId] = useState<string>(() =>
-    readOrCreateSessionId(),
-  );
+export function MyWorldClient({ initialFilter, email }: MyWorldClientProps) {
+  const router = useRouter();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [articlesByQuery, setArticlesByQuery] = useState<ArticlesByQuery>({});
   const [pending, setPending] = useState<PendingExchange | null>(null);
   const [input, setInput] = useState("");
-  // If we couldn't get a session id (SSR fallback), there's nothing to load.
-  const [historyLoading, setHistoryLoading] = useState<boolean>(() =>
-    Boolean(sessionId),
-  );
+  const [filterText, setFilterText] = useState(initialFilter);
+  const [filterSavedAt, setFilterSavedAt] = useState<number | null>(null);
+  const [filterSaving, setFilterSaving] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Fetch history for the current session. The setState calls live inside
-  // an async callback, so they don't trigger the cascading-render rule.
+  const filterDirty = filterText.trim() !== initialFilter.trim();
+
+  const saveFilter = useCallback(async () => {
+    setFilterSaving(true);
+    try {
+      const res = await fetch("/api/auth/filter", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ filter: filterText }),
+      });
+      if (res.ok) {
+        setFilterSavedAt(Date.now());
+        router.refresh();
+      }
+    } catch (err) {
+      console.error("[my-world] filter save failed:", err);
+    } finally {
+      setFilterSaving(false);
+    }
+  }, [filterText, router]);
+
+  const logout = useCallback(async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }, [router]);
+
+  // Fetch history once on mount — the API authenticates via session cookie.
   useEffect(() => {
-    if (!sessionId) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(
-          `/api/meridian-ai/history?sessionId=${encodeURIComponent(sessionId)}`,
-        );
+        const res = await fetch("/api/meridian-ai/history");
         if (!res.ok) return;
         const data = (await res.json()) as { items: HistoryItem[] };
         if (!cancelled) setHistory(data.items);
@@ -99,7 +108,7 @@ export function MyWorldClient() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -108,7 +117,7 @@ export function MyWorldClient() {
   const submit = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || !sessionId) return;
+      if (!trimmed) return;
       setInput("");
       setPending({ rawText: trimmed, loading: true, error: null });
       try {
@@ -116,7 +125,6 @@ export function MyWorldClient() {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            sessionId,
             text: trimmed,
             mode: "extractive",
             length: "medium",
@@ -153,30 +161,22 @@ export function MyWorldClient() {
         );
       }
     },
-    [sessionId],
+    [],
   );
 
   const clearHistory = useCallback(async () => {
-    if (!sessionId) return;
     const ok = window.confirm(
-      "Clear your My World history? This removes saved queries on this device.",
+      "Clear your My World history? This removes saved queries from your account.",
     );
     if (!ok) return;
     try {
-      await fetch("/api/meridian-ai/history/clear", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      });
+      await fetch("/api/meridian-ai/history/clear", { method: "POST" });
     } catch (err) {
       console.error("[my-world] clear failed:", err);
     }
     setHistory([]);
     setArticlesByQuery({});
-    const fresh = makeSessionId();
-    window.localStorage.setItem(STORAGE_KEY, fresh);
-    setSessionId(fresh);
-  }, [sessionId]);
+  }, []);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,21 +195,30 @@ export function MyWorldClient() {
       {/* Left Sidebar */}
       <aside className="w-full md:w-[320px] shrink-0 border-r border-border flex flex-col overflow-y-auto bg-secondary/30">
         <div className="p-6">
-          <Eyebrow className="block mb-3">Daily AI Filter</Eyebrow>
+          <Eyebrow className="block mb-3">Daily AI Summary</Eyebrow>
           <p className="font-sans text-[13px] text-muted-foreground mb-3 leading-relaxed">
-            Tell Meridian what you want to read each morning. Your selected categories will appear as an AI summary every 24 hours.
+            Give Meridian a prompt in this textbox to generate a summary of what you want to read each morning. Saved to your account.
           </p>
           <textarea
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
             placeholder="e.g. JSE updates, Global AI policy, Tech earnings..."
             rows={3}
             className="w-full resize-none rounded-md border border-border px-3 py-2 font-sans text-[13px] text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent mb-2"
           />
           <button
             type="button"
-            className="w-full h-9 rounded-md bg-foreground text-background font-mono text-[10px] uppercase tracking-[0.1em] hover:bg-foreground/90 transition-colors"
+            onClick={saveFilter}
+            disabled={filterSaving || !filterDirty}
+            className="w-full h-9 rounded-md bg-foreground text-background font-mono text-[10px] uppercase tracking-[0.1em] hover:bg-foreground/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Save Filter
+            {filterSaving ? "Saving…" : filterDirty ? "Save Filter" : "Saved"}
           </button>
+          {filterSavedAt && !filterDirty && !filterSaving && (
+            <p className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground mt-2">
+              Saved to your account.
+            </p>
+          )}
         </div>
 
         <Hairline />
@@ -246,6 +255,22 @@ export function MyWorldClient() {
             </ul>
           )}
         </div>
+
+        <Hairline />
+
+        <div className="p-6">
+          <Eyebrow className="block mb-2">Account</Eyebrow>
+          <p className="font-sans text-[12px] text-foreground truncate mb-3" title={email}>
+            {email}
+          </p>
+          <button
+            type="button"
+            onClick={logout}
+            className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground hover:text-destructive transition-colors"
+          >
+            Sign out
+          </button>
+        </div>
       </aside>
 
       {/* Main Chat Area */}
@@ -265,6 +290,8 @@ export function MyWorldClient() {
             </div>
 
             <Hairline className="mb-10" />
+
+            <DailyBriefPanel />
 
             {!historyLoading && history.length === 0 && !pending && (
               <div className="py-10 text-center">
@@ -353,7 +380,7 @@ export function MyWorldClient() {
                   </p>
                   <button
                     type="submit"
-                    disabled={!input.trim() || !sessionId || pending?.loading}
+                    disabled={!input.trim() || pending?.loading}
                     className="h-10 px-6 rounded-md bg-foreground text-background font-mono text-[11px] uppercase tracking-[0.1em] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-foreground/90 transition-colors"
                   >
                     Ask

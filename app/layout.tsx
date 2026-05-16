@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 
-import { Ticker } from "@/components/home/ui/Ticker";
-import { Navbar } from "@/components/home/ui/Navbar";
-import { Footer } from "@/components/home/sections/Footer";
+import { Ticker } from "@/components/layout/Ticker";
+import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
 import { getMarketData } from "@/lib/markets";
 
 const inter = Inter({

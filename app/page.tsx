@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Hero } from "@/components/home/sections/Hero";
+import { Hero } from "@/components/home/Hero";
 
 export const metadata: Metadata = {
   title: "MERIDIAN — Daily Intelligence Brief",
