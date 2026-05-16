@@ -53,9 +53,11 @@ const SP500_TICKERS = [
   "MA", "JNJ", "WMT", "PG", "UNH", "HD", "BAC", "ABBV", "KO", "XOM", "AVGO", "LLY", "CVX", "COST"
 ];
 
+// BHP delisted from the JSE in 2022 (consolidated to single ASX listing).
+// AMS (Anglo American Platinum) replaces it — same materials sector.
 const JSE_TICKERS = [
   "OUT.JO", "WBC.JO", "CPI.JO", "SHP.JO", "NPN.JO", "PRX.JO", "SBK.JO", "FSR.JO",
-  "ABG.JO", "NED.JO", "MTN.JO", "VOD.JO", "AGL.JO", "BHP.JO", "SOL.JO", "DSY.JO",
+  "ABG.JO", "NED.JO", "MTN.JO", "VOD.JO", "AGL.JO", "AMS.JO", "SOL.JO", "DSY.JO",
   "SLM.JO", "OML.JO", "BVT.JO", "BID.JO", "MRP.JO", "WHL.JO", "CLS.JO", "APN.JO"
 ];
 

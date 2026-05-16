@@ -50,10 +50,10 @@ const FEEDS: FeedSource[] = [
   { name: "FT Markets", url: "https://www.ft.com/markets?format=rss", category: "finance" },
 
   // South Africa
+  // Daily Maverick and MyBroadband block Railway's egress IP range (Cloudflare
+  // 403). Re-add them if/when we route through a proxy or move hosts.
   { name: "News24", url: "https://feeds.24.com/articles/news24/TopStories/rss", category: "south-africa" },
-  { name: "Daily Maverick", url: "https://www.dailymaverick.co.za/feed/", category: "south-africa" },
   { name: "Moneyweb SA", url: "https://www.moneyweb.co.za/feed/", category: "south-africa" },
-  { name: "MyBroadband", url: "https://mybroadband.co.za/news/feed", category: "south-africa" },
 ];
 
 // ─── XML PARSER CONFIG ─────────────────────────────────────────
@@ -152,11 +152,6 @@ async function fetchFeed(source: FeedSource): Promise<NewsItem[]> {
     const headers: Record<string, string> = {
       Accept: "application/rss+xml, application/xml, text/xml, application/atom+xml",
     };
-
-    // Daily Maverick requires a Referer to bypass edge blocks
-    if (source.name === "Daily Maverick") {
-      headers["Referer"] = "https://www.dailymaverick.co.za/";
-    }
 
     const response = await fetchWithBrowserHeaders(source.url, {
       revalidate: 600,
