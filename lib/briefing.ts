@@ -9,6 +9,7 @@ import { unstable_cache } from "next/cache";
 import { getTopHeadlines, type NewsItem } from "./feeds";
 import type { ArticleInput } from "./meridian-ai";
 import { composeBriefing, type BriefingLane } from "./deepseek/analyze";
+import { isDeepSeekConfigured } from "./deepseek/client";
 
 export interface BriefingData {
   content: string;
@@ -56,10 +57,20 @@ async function buildBriefingContent(headlines: NewsItem[]): Promise<string> {
     throw new Error("no-lanes-with-content");
   }
 
+  if (!isDeepSeekConfigured()) {
+    console.error("[briefing] no DeepSeek provider configured — using fallback");
+    return getFallbackBriefing(headlines);
+  }
+
   const today = new Date().toISOString().slice(0, 10);
   const { text, stub } = await composeBriefing({ lanes, date: today });
 
-  if (stub || !text.trim()) {
+  if (stub) {
+    console.error("[briefing] DeepSeek returned stub — using fallback");
+    return getFallbackBriefing(headlines);
+  }
+  if (!text.trim()) {
+    console.error("[briefing] DeepSeek returned empty text — using fallback");
     return getFallbackBriefing(headlines);
   }
   return text;
@@ -107,6 +118,6 @@ function getFallbackBriefing(headlines: NewsItem[]): string {
 // format / prompt changes so old cached output is treated as a miss.
 export const getCachedBriefing = unstable_cache(
   generateBriefing,
-  ["daily-briefing-v2"],
+  ["daily-briefing-v3"],
   { revalidate: 43200, tags: ["briefing"] },
 );
