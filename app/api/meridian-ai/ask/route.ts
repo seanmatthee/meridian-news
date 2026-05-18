@@ -10,14 +10,11 @@
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  interpretIntent,
-  postIntentScopeCheck,
-  preflightScopeCheck,
-} from "@/lib/meridian-ai";
+import { interpretIntent } from "@/lib/meridian-ai";
 import type { SummaryLength, SummaryMode } from "@/lib/meridian-ai";
 import { selectArticlesForIntent } from "@/lib/meridian-ai/news-bridge";
 import { summarizeWithDeepSeek } from "@/lib/meridian-ai/summarize";
+import { answerWithoutArticles } from "@/lib/deepseek/analyze";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -62,52 +59,11 @@ export async function POST(req: Request) {
   try {
     const sessionId = await ensureUserSession(user.id);
 
-    const preflight = preflightScopeCheck(text);
-    if (!preflight.ok) {
-      const refusalRow = await prisma.userQuery.create({
-        data: {
-          sessionId,
-          rawText: text,
-          interpretedIntent: JSON.stringify({ refused: true, reason: preflight.reason }),
-        },
-      });
-      return NextResponse.json({
-        queryId: refusalRow.id,
-        intent: { outlets: [], topics: [], region: "global", timeframe: "today", confidence: 0 },
-        articles: [],
-        summary: preflight.message,
-        mode,
-        length,
-        message: "off-topic",
-      });
-    }
-
+    // Scope guard removed — the regex heuristics were rejecting too many
+    // legitimate news questions. DeepSeek's own system prompt handles
+    // off-topic refusals, and the per-call USD cap in deepseek/client
+    // limits the blast radius of any single bad question.
     const intent = await interpretIntent(text);
-
-    const postCheck = postIntentScopeCheck(
-      text,
-      intent.confidence,
-      intent.outlets.length,
-      intent.topics.length,
-    );
-    if (!postCheck.ok) {
-      const refusalRow = await prisma.userQuery.create({
-        data: {
-          sessionId,
-          rawText: text,
-          interpretedIntent: JSON.stringify({ ...intent, refused: true, reason: postCheck.reason }),
-        },
-      });
-      return NextResponse.json({
-        queryId: refusalRow.id,
-        intent,
-        articles: [],
-        summary: postCheck.message,
-        mode,
-        length,
-        message: "off-topic",
-      });
-    }
 
     const queryRow = await prisma.userQuery.create({
       data: {
@@ -119,14 +75,18 @@ export async function POST(req: Request) {
 
     const articles = await selectArticlesForIntent(intent, { maxArticles: 12 });
     if (articles.length === 0) {
+      // No articles matched — let DeepSeek answer from general knowledge if
+      // the question is news-shaped, or refuse if it's clearly off-topic.
+      const fallback = await answerWithoutArticles({ question: text });
       return NextResponse.json({
         queryId: queryRow.id,
         intent,
         articles: [],
-        summary: null,
+        summary: fallback.text,
         mode,
         length,
         message: "no-matching-articles",
+        stub: fallback.stub,
       });
     }
 

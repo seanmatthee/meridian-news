@@ -8,7 +8,11 @@
  *
  * Both providers are OpenAI-compatible so the request body shape is the same.
  * Only the URL, model id, and a couple of OpenRouter-specific headers differ.
+ *
+ * Every call passes through estimateAndCap() in ./cost, which refuses input
+ * that would exceed the per-call USD budget and lowers max_tokens to fit.
  */
+import { estimateAndCap, PER_CALL_BUDGET_USD } from "./cost";
 
 interface ProviderConfig {
   endpoint: string;
@@ -77,6 +81,26 @@ export async function chatCompletion(
     return { text: stubResponse(req), stub: true };
   }
 
+  // Enforce the per-call USD budget. If the input alone would blow it,
+  // return the stub instead of making the request.
+  const inputText = req.messages.map((m) => m.content).join("\n");
+  const cap = estimateAndCap({
+    inputText,
+    requestedMaxOutput: req.maxTokens ?? 1200,
+  });
+  if (!cap.ok) {
+    console.warn(
+      `[deepseek] input rejected — would exceed $${PER_CALL_BUDGET_USD} budget ` +
+        `(estimated ${cap.inputTokens} input tokens)`,
+    );
+    return {
+      text:
+        "That request is too large for Meridian to answer within its per-call budget. " +
+        "Try a shorter question.",
+      stub: true,
+    };
+  }
+
   let res: Response;
   try {
     res = await fetch(provider.endpoint, {
@@ -90,7 +114,7 @@ export async function chatCompletion(
         model: req.model ?? provider.model,
         messages: req.messages,
         temperature: req.temperature ?? 0.4,
-        max_tokens: req.maxTokens ?? 1200,
+        max_tokens: cap.maxOutputTokens,
         stream: false,
       }),
     });

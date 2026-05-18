@@ -8,8 +8,6 @@
 export { embed, embedMany, warmupEmbedder } from "./embeddings";
 export { cosine, dot, norm, topK } from "./similarity";
 export { interpretIntent } from "./intent";
-export { preflightScopeCheck, postIntentScopeCheck } from "./scope-guard";
-export type { ScopeDecision } from "./scope-guard";
 export { summarizeWithDeepSeek } from "./summarize";
 export {
   hashQuery,

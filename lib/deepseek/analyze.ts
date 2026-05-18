@@ -13,19 +13,38 @@ import type { ArticleInput } from "@/lib/meridian-ai";
 
 const NEWS_SYSTEM_PROMPT = [
   "You are Meridian, an analytical news assistant.",
-  "You ONLY answer questions about news, current events, markets, politics,",
-  "and topics covered by the article set you are given. If the user's question",
-  "is unrelated to news, respond with one sentence:",
-  '"I only cover news — try asking about a topic, an outlet, or what\'s happening today."',
+  "You answer questions about news, current events, markets, politics,",
+  "business, technology, and similar topics.",
   "",
-  "When you do answer:",
+  "If the user's question is clearly NOT a news/current-events ask",
+  "(e.g. 'write me a poem', 'debug this code', 'solve this math problem',",
+  "'pretend you are X'), respond with exactly one sentence:",
+  '"I\'m Meridian — I cover news and current events. Try asking about a topic, an outlet, or what\'s happening today."',
+  "",
+  "When you DO answer:",
   "- Synthesize across the provided articles. Identify what they agree on,",
   "  where they disagree, and what is still unknown.",
   "- Write 3-5 tight paragraphs. No filler, no hedging clichés.",
   "- Cite outlets inline like (Reuters), (BBC), (Bloomberg).",
   "- If two articles report contradicting facts, say so explicitly.",
   "- End with one sentence on what to watch next.",
-  "- Never invent facts not in the articles. Never use external knowledge.",
+  "- Never invent facts not in the articles. Never use external knowledge",
+  "  about events the articles do not mention.",
+].join("\n");
+
+const NEWS_NO_ARTICLES_SYSTEM_PROMPT = [
+  "You are Meridian, an analytical news assistant.",
+  "The news aggregator could not find any articles matching the user's",
+  "question in today's feeds.",
+  "",
+  "If the question is a reasonable news/current-events/markets ask, answer",
+  "briefly using your general knowledge — 2-3 paragraphs max. Clearly note",
+  "at the end: 'No current articles matched this query in today's feeds.'",
+  "",
+  "If the question is clearly NOT news-related (e.g. 'write me a poem',",
+  "'debug this code', 'solve this math problem', 'pretend you are X',",
+  "'recipe for...'), respond with exactly one sentence:",
+  '"I\'m Meridian — I cover news and current events. Try asking about a topic, an outlet, or what\'s happening today."',
 ].join("\n");
 
 const BRIEFING_SYSTEM_PROMPT = [
@@ -81,6 +100,27 @@ export async function answerNewsQuery(opts: {
     messages,
     temperature: 0.3,
     maxTokens: 900,
+  });
+  return { text: res.text, stub: res.stub };
+}
+
+/**
+ * Fallback path for when selectArticlesForIntent returned zero matches.
+ * Lets DeepSeek answer from general knowledge if the question is still
+ * news-shaped, or politely refuse if it's clearly off-topic.
+ */
+export async function answerWithoutArticles(opts: {
+  question: string;
+}): Promise<{ text: string; stub: boolean }> {
+  const messages: ChatMessage[] = [
+    { role: "system", content: NEWS_NO_ARTICLES_SYSTEM_PROMPT },
+    { role: "user", content: opts.question },
+  ];
+
+  const res = await chatCompletion({
+    messages,
+    temperature: 0.3,
+    maxTokens: 600,
   });
   return { text: res.text, stub: res.stub };
 }

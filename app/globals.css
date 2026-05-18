@@ -293,37 +293,10 @@
   }
 }
 
-/* Mobile: globes stop orbiting and pin to opposite corners of the hero so
-   they read as anchored UI rather than floating near the wordmark. */
+/* Mobile: hide the orbiting mini-globes entirely. The hero CTA buttons
+   ("The World" / "My World") already provide navigation on small screens. */
 @media (max-width: 480px) {
-  .orbit-ring {
+  .orbit-stage {
     display: none;
-  }
-  .orbit-shell,
-  .orbit-counter {
-    animation: none;
-  }
-  .orbit-slot {
-    position: absolute;
-    transform: none;
-    width: auto;
-    height: auto;
-  }
-  .orbit-slot--top {
-    top: 1.5rem;
-    right: 1.25rem;
-    left: auto;
-  }
-  .orbit-slot--bottom {
-    top: auto;
-    bottom: 1.5rem;
-    left: 1.25rem;
-  }
-  .orbit-counter {
-    translate: 0 0;
-  }
-  /* Don't flip "The World" upside-down on mobile — it's stationary at the bottom. */
-  .orbit-slot--bottom .orbit-counter > div {
-    transform: none !important;
   }
 }
