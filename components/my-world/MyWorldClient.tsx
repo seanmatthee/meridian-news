@@ -192,8 +192,9 @@ export function MyWorldClient({ initialFilter, email }: MyWorldClientProps) {
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-4.5rem)]">
-      {/* Left Sidebar */}
-      <aside className="w-full md:w-[320px] shrink-0 border-r border-border flex flex-col overflow-y-auto bg-secondary/30">
+      {/* Left Sidebar — desktop only. Mobile shows Filter inline in main column,
+          and History/Account at the bottom of the main column. */}
+      <aside className="hidden md:flex w-full md:w-[320px] shrink-0 border-r border-border flex-col overflow-y-auto bg-secondary/30">
         <div className="p-6">
           <Eyebrow className="block mb-3">Daily AI Summary</Eyebrow>
           <p className="font-sans text-[13px] text-muted-foreground mb-3 leading-relaxed">
@@ -291,6 +292,35 @@ export function MyWorldClient({ initialFilter, email }: MyWorldClientProps) {
 
             <Hairline className="mb-10" />
 
+            {/* Mobile-only Filter — sits between heading and chat per spec.
+                Desktop shows this in the left sidebar. */}
+            <div className="md:hidden mb-10">
+              <Eyebrow className="block mb-3">Daily AI Summary</Eyebrow>
+              <p className="font-sans text-[13px] text-muted-foreground mb-3 leading-relaxed">
+                Give Meridian a prompt in this textbox to generate a summary of what you want to read each morning. Saved to your account.
+              </p>
+              <textarea
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                placeholder="e.g. JSE updates, Global AI policy, Tech earnings..."
+                rows={3}
+                className="w-full resize-none rounded-md border border-border px-3 py-2 font-sans text-[13px] text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent mb-2"
+              />
+              <button
+                type="button"
+                onClick={saveFilter}
+                disabled={filterSaving || !filterDirty}
+                className="w-full h-9 rounded-md bg-foreground text-background font-mono text-[10px] uppercase tracking-[0.1em] hover:bg-foreground/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {filterSaving ? "Saving…" : filterDirty ? "Save Filter" : "Saved"}
+              </button>
+              {filterSavedAt && !filterDirty && !filterSaving && (
+                <p className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground mt-2">
+                  Saved to your account.
+                </p>
+              )}
+            </div>
+
             <DailyBriefPanel />
 
             {!historyLoading && history.length === 0 && !pending && (
@@ -355,6 +385,53 @@ export function MyWorldClient({ initialFilter, email }: MyWorldClientProps) {
                 )}
               </div>
             )}
+
+            {/* Mobile-only History + Account — pushed to the bottom of the
+                column so the priority items (heading, filter, chat) sit up top.
+                Desktop shows these in the left sidebar. */}
+            <div className="md:hidden mt-12 pt-8 border-t border-border space-y-8">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <Eyebrow className="block">Chat History</Eyebrow>
+                  {history.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearHistory}
+                      className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {historyLoading ? (
+                  <p className="font-sans text-[13px] italic text-muted-foreground">Loading...</p>
+                ) : history.length === 0 ? (
+                  <p className="font-sans text-[13px] italic text-muted-foreground">No recent chats.</p>
+                ) : (
+                  <ul className="flex flex-col gap-3">
+                    {history.map((h) => (
+                      <li key={h.queryId} className="font-sans text-[13px] text-foreground truncate">
+                        {h.rawText}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div>
+                <Eyebrow className="block mb-2">Account</Eyebrow>
+                <p className="font-sans text-[12px] text-foreground truncate mb-3" title={email}>
+                  {email}
+                </p>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
 
             <div ref={bottomRef} className="h-24" />
           </div>
