@@ -10,6 +10,7 @@
  */
 import { NextResponse } from "next/server";
 import { generateDigestsForAllUsers } from "@/lib/daily-digest";
+import { getRequestIp, isIpRateLimited } from "@/lib/rate-limit-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,13 @@ function authorized(req: Request): boolean {
 }
 
 async function handle(req: Request) {
+  // Even with the shared secret, IP-limit defense in depth in case the
+  // secret ever leaks. Generous enough that Railway Cron retries fit.
+  const ip = getRequestIp(req);
+  if (isIpRateLimited(ip, { scope: "cron/daily-digest", limit: 12, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json({ error: "rate-limited" }, { status: 429 });
+  }
+
   if (!authorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

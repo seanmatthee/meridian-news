@@ -9,12 +9,20 @@ import {
   verifyPassword,
 } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
+import { getRequestIp, isIpRateLimited } from "@/lib/rate-limit-ip";
 
 export const runtime = "nodejs";
 
 const GENERIC_ERROR = "Email or password is incorrect.";
 
 export async function POST(req: Request) {
+  // Stop password brute-force. 20/15min still allows a real corporate NAT
+  // with shared egress IP to login normally.
+  const ip = getRequestIp(req);
+  if (isIpRateLimited(ip, { scope: "auth/login", limit: 20, windowMs: 15 * 60 * 1000 })) {
+    return NextResponse.json({ error: "rate-limited" }, { status: 429 });
+  }
+
   let body: { email?: string; password?: string };
   try {
     body = await req.json();

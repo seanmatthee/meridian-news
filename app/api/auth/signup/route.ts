@@ -14,10 +14,17 @@ import {
 } from "@/lib/auth/password";
 import { generateOtp, hashOtp, otpExpiry } from "@/lib/auth/otp";
 import { sendOtpEmail } from "@/lib/email/send";
+import { getRequestIp, isIpRateLimited } from "@/lib/rate-limit-ip";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  // Stop OTP/email abuse from a single IP before doing any DB work.
+  const ip = getRequestIp(req);
+  if (isIpRateLimited(ip, { scope: "auth/signup", limit: 5, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json({ error: "rate-limited" }, { status: 429 });
+  }
+
   let body: { email?: string; password?: string };
   try {
     body = await req.json();

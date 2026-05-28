@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { generateDigestForUser } from "@/lib/daily-digest";
+import { getRequestIp, isIpRateLimited } from "@/lib/rate-limit-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +39,12 @@ export async function GET() {
   });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  const ip = getRequestIp(req);
+  if (isIpRateLimited(ip, { scope: "daily-brief/refresh", limit: 10, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json({ error: "rate-limited" }, { status: 429 });
+  }
+
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
@@ -46,7 +52,15 @@ export async function POST() {
     userId: user.id,
     filter: user.filter,
     force: true,
+    endpoint: "daily-brief",
   });
+
+  if (result.status === "rate-limited") {
+    return NextResponse.json(
+      { ok: false, status: result.status, detail: result.detail },
+      { status: 429 },
+    );
+  }
 
   if (result.status === "generated") {
     const brief = await prisma.dailyBrief.findUnique({

@@ -9,6 +9,15 @@ import { Resend } from "resend";
 
 const FROM_DEFAULT = process.env.RESEND_FROM ?? "";
 
+// Module-scope Resend client. Lazy so the dev fallback (no API key) doesn't
+// require constructing the client at all, and so a single instance is reused
+// across every email send instead of paying constructor cost per request.
+let resendClient: Resend | null = null;
+function getResendClient(apiKey: string): Resend {
+  if (!resendClient) resendClient = new Resend(apiKey);
+  return resendClient;
+}
+
 export interface SendOtpEmailArgs {
   to: string;
   otp: string;
@@ -33,7 +42,7 @@ export async function sendOtpEmail(args: SendOtpEmailArgs): Promise<void> {
     return;
   }
 
-  const resend = new Resend(apiKey);
+  const resend = getResendClient(apiKey);
   const { error } = await resend.emails.send({
     from,
     to: args.to,

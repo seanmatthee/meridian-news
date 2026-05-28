@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { readCachedSummary, writeCachedSummary, articleKey } from "./cache";
 import type { ArticleInput, IntentResult } from "./types";
 import { answerNewsQuery } from "@/lib/deepseek/analyze";
+import type { LlmEndpoint } from "@/lib/deepseek/rate-limit";
 
 interface DeepSeekSummarizeRequest {
   question: string;
@@ -14,6 +15,10 @@ interface DeepSeekSummarizeRequest {
   intent?: IntentResult;
   sessionId?: string;
   queryId?: number;
+  /** User triggering the call. Null for cron / public-page calls. */
+  userId: string | null;
+  /** Drives per-user rate limits in deepseek/rate-limit.ts. */
+  endpoint: LlmEndpoint;
 }
 
 interface DeepSeekSummarizeResult {
@@ -75,6 +80,8 @@ export async function summarizeWithDeepSeek(
   const { text, stub } = await answerNewsQuery({
     question: req.question,
     articles: req.articles,
+    userId: req.userId,
+    endpoint: req.endpoint,
   });
 
   if (!text.trim()) throw new Error("deepseek-empty");

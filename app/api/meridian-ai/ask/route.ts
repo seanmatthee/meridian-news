@@ -15,7 +15,9 @@ import type { SummaryLength, SummaryMode } from "@/lib/meridian-ai";
 import { selectArticlesForIntent } from "@/lib/meridian-ai/news-bridge";
 import { summarizeWithDeepSeek } from "@/lib/meridian-ai/summarize";
 import { answerWithoutArticles } from "@/lib/deepseek/analyze";
+import { checkRateLimit } from "@/lib/deepseek/rate-limit";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getRequestIp, isIpRateLimited } from "@/lib/rate-limit-ip";
 
 export const runtime = "nodejs";
 
@@ -36,6 +38,13 @@ async function ensureUserSession(userId: string): Promise<string> {
 }
 
 export async function POST(req: Request) {
+  // IP-level guard runs first — if a botnet rotates accounts behind one IP,
+  // the per-user DeepSeek limiter wouldn't catch it.
+  const ip = getRequestIp(req);
+  if (isIpRateLimited(ip, { scope: "meridian-ai/ask", limit: 60, windowMs: 60 * 60 * 1000 })) {
+    return NextResponse.json({ error: "rate-limited" }, { status: 429 });
+  }
+
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
@@ -54,6 +63,22 @@ export async function POST(req: Request) {
 
   if (!text) {
     return NextResponse.json({ error: "empty-input" }, { status: 400 });
+  }
+
+  // Rate limit before doing any work — intent classification is cheap but
+  // we still want to fail fast and avoid loading the model when a user is
+  // already over their quota.
+  const gate = await checkRateLimit({ userId: user.id, endpoint: "ask" });
+  if (!gate.allowed) {
+    return NextResponse.json(
+      { error: "rate-limited", reason: gate.reason, detail: gate.detail },
+      {
+        status: 429,
+        headers: gate.retryAfterSec
+          ? { "Retry-After": String(gate.retryAfterSec) }
+          : undefined,
+      },
+    );
   }
 
   try {
@@ -77,7 +102,11 @@ export async function POST(req: Request) {
     if (articles.length === 0) {
       // No articles matched — let DeepSeek answer from general knowledge if
       // the question is news-shaped, or refuse if it's clearly off-topic.
-      const fallback = await answerWithoutArticles({ question: text });
+      const fallback = await answerWithoutArticles({
+        question: text,
+        userId: user.id,
+        endpoint: "ask",
+      });
       return NextResponse.json({
         queryId: queryRow.id,
         intent,
@@ -96,6 +125,8 @@ export async function POST(req: Request) {
       intent,
       sessionId,
       queryId: queryRow.id,
+      userId: user.id,
+      endpoint: "ask",
     });
 
     return NextResponse.json({

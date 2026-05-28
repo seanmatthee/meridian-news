@@ -14,10 +14,17 @@ import {
   summarizeWithDeepSeek,
 } from "@/lib/meridian-ai";
 import { selectArticlesForIntent } from "@/lib/meridian-ai/news-bridge";
+import { checkRateLimit, type LlmEndpoint } from "@/lib/deepseek/rate-limit";
 
 export interface DigestResult {
   userId: string;
-  status: "generated" | "skipped-no-filter" | "skipped-no-articles" | "already-exists" | "failed";
+  status:
+    | "generated"
+    | "skipped-no-filter"
+    | "skipped-no-articles"
+    | "already-exists"
+    | "failed"
+    | "rate-limited";
   detail?: string;
 }
 
@@ -32,6 +39,12 @@ export async function generateDigestForUser(opts: {
   filter: string | null;
   /** Pass true to overwrite an existing brief for today. */
   force?: boolean;
+  /**
+   * Which entry point asked for this brief. "daily-brief" comes from the
+   * user clicking Refresh (capped at 5/day per user). "daily-digest" comes
+   * from the cron job (no per-user cap, only the global ceiling).
+   */
+  endpoint: Extract<LlmEndpoint, "daily-brief" | "daily-digest">;
 }): Promise<DigestResult> {
   const filter = (opts.filter ?? "").trim();
   if (!filter) {
@@ -49,6 +62,15 @@ export async function generateDigestForUser(opts: {
     }
   }
 
+  const gate = await checkRateLimit({ userId: opts.userId, endpoint: opts.endpoint });
+  if (!gate.allowed) {
+    return {
+      userId: opts.userId,
+      status: "rate-limited",
+      detail: gate.detail ?? gate.reason,
+    };
+  }
+
   try {
     const intent = await interpretIntent(filter);
     const articles = await selectArticlesForIntent(intent, { maxArticles: 12 });
@@ -64,6 +86,8 @@ export async function generateDigestForUser(opts: {
       question: filter,
       articles,
       intent,
+      userId: opts.userId,
+      endpoint: opts.endpoint,
     });
 
     if (!result.summary.trim() || result.stub) {
@@ -110,7 +134,11 @@ export async function generateDigestsForAllUsers(): Promise<DigestResult[]> {
   // Sequential, not parallel — the LLM call is heavy and Railway's CPU is
   // modest. Parallelizing risks rate limits and tail-latency spikes.
   for (const u of users) {
-    const res = await generateDigestForUser({ userId: u.id, filter: u.filter });
+    const res = await generateDigestForUser({
+      userId: u.id,
+      filter: u.filter,
+      endpoint: "daily-digest",
+    });
     results.push(res);
   }
   return results;

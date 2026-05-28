@@ -136,3 +136,18 @@ model UserSummary {
   createdAt   DateTime    @default(now())
   queries     UserQuery[]
 }
+
+// One row per real (non-stub) DeepSeek call. Drives per-user rate limiting
+// and the global daily USD ceiling enforced in lib/deepseek/rate-limit.ts.
+// `userId` is null for system-initiated calls (cron, /briefing page cache).
+model LlmCall {
+  id           Int      @id @default(autoincrement())
+  userId       String?
+  endpoint     String
+  worstCaseUsd Float
+  createdAt    DateTime @default(now())
+
+  @@index([endpoint, createdAt])
+  @@index([userId, endpoint, createdAt])
+  @@index([createdAt])
+}

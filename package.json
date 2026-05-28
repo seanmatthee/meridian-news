@@ -20,6 +20,11 @@
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
+  "overrides": {
+    "protobufjs": "^7.5.8",
+    "postcss": "^8.5.10",
+    "qs": "^6.15.2"
+  },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
     "@prisma/client": "^6.19.3",

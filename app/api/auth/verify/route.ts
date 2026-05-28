@@ -9,10 +9,18 @@ import { prisma } from "@/lib/prisma";
 import { normalizeEmail, validateEmail } from "@/lib/auth/password";
 import { hashOtp, isOtpExpired, isOtpLockedOut } from "@/lib/auth/otp";
 import { createSession } from "@/lib/auth/session";
+import { getRequestIp, isIpRateLimited } from "@/lib/rate-limit-ip";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  // OTP brute-force from a single IP. The per-pending-user lockout already
+  // exists; this stops the attacker who rotates the email address.
+  const ip = getRequestIp(req);
+  if (isIpRateLimited(ip, { scope: "auth/verify", limit: 15, windowMs: 15 * 60 * 1000 })) {
+    return NextResponse.json({ error: "rate-limited" }, { status: 429 });
+  }
+
   let body: { email?: string; otp?: string };
   try {
     body = await req.json();

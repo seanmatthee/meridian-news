@@ -13,6 +13,7 @@
  * that would exceed the per-call USD budget and lowers max_tokens to fit.
  */
 import { estimateAndCap, PER_CALL_BUDGET_USD } from "./cost";
+import { recordLlmCall, type LlmEndpoint } from "./rate-limit";
 
 interface ProviderConfig {
   endpoint: string;
@@ -60,6 +61,10 @@ export interface DeepSeekRequest {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  /** User triggering the call, or null for system-initiated (cron, briefing cache). */
+  userId?: string | null;
+  /** Which logical endpoint is making the call — drives per-user rate limits. */
+  endpoint: LlmEndpoint;
 }
 
 export interface DeepSeekResponse {
@@ -143,6 +148,15 @@ export async function chatCompletion(
     console.error(`[deepseek/${provider.name}] empty response`);
     return { text: stubResponse(req), stub: true };
   }
+
+  // Real call succeeded — log against the rate-limit table so future
+  // checkRateLimit() calls see this spend. worstCaseUsd is the conservative
+  // upper bound (input + max-allowed output) for global ceiling math.
+  await recordLlmCall({
+    userId: req.userId ?? null,
+    endpoint: req.endpoint,
+    worstCaseUsd: cap.worstCaseUsd,
+  });
 
   return {
     text,

@@ -63,7 +63,12 @@ async function buildBriefingContent(headlines: NewsItem[]): Promise<string> {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const { text, stub } = await composeBriefing({ lanes, date: today });
+  const { text, stub } = await composeBriefing({
+    lanes,
+    date: today,
+    userId: null,
+    endpoint: "briefing",
+  });
 
   if (stub) {
     console.error("[briefing] DeepSeek returned stub — using fallback");

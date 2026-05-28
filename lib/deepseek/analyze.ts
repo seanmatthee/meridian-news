@@ -9,6 +9,7 @@
  *     "Today's focus" block.
  */
 import { chatCompletion, type ChatMessage } from "./client";
+import type { LlmEndpoint } from "./rate-limit";
 import type { ArticleInput } from "@/lib/meridian-ai";
 
 const NEWS_SYSTEM_PROMPT = [
@@ -82,6 +83,8 @@ function articlesToContext(articles: ArticleInput[]): string {
 export async function answerNewsQuery(opts: {
   question: string;
   articles: ArticleInput[];
+  userId: string | null;
+  endpoint: LlmEndpoint;
 }): Promise<{ text: string; stub: boolean }> {
   const messages: ChatMessage[] = [
     { role: "system", content: NEWS_SYSTEM_PROMPT },
@@ -100,6 +103,8 @@ export async function answerNewsQuery(opts: {
     messages,
     temperature: 0.3,
     maxTokens: 900,
+    userId: opts.userId,
+    endpoint: opts.endpoint,
   });
   return { text: res.text, stub: res.stub };
 }
@@ -111,6 +116,8 @@ export async function answerNewsQuery(opts: {
  */
 export async function answerWithoutArticles(opts: {
   question: string;
+  userId: string | null;
+  endpoint: LlmEndpoint;
 }): Promise<{ text: string; stub: boolean }> {
   const messages: ChatMessage[] = [
     { role: "system", content: NEWS_NO_ARTICLES_SYSTEM_PROMPT },
@@ -121,6 +128,8 @@ export async function answerWithoutArticles(opts: {
     messages,
     temperature: 0.3,
     maxTokens: 600,
+    userId: opts.userId,
+    endpoint: opts.endpoint,
   });
   return { text: res.text, stub: res.stub };
 }
@@ -133,6 +142,8 @@ export interface BriefingLane {
 export async function composeBriefing(opts: {
   lanes: BriefingLane[];
   date: string;
+  userId: string | null;
+  endpoint: LlmEndpoint;
 }): Promise<{ text: string; stub: boolean }> {
   const lanesBlock = opts.lanes
     .filter((l) => l.articles.length > 0)
@@ -165,6 +176,8 @@ export async function composeBriefing(opts: {
     messages,
     temperature: 0.4,
     maxTokens: 1400,
+    userId: opts.userId,
+    endpoint: opts.endpoint,
   });
   return { text: res.text, stub: res.stub };
 }
